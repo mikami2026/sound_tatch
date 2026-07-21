@@ -1,0 +1,20 @@
+.button {
+  font-size: 18px;
+  font-weight: 600;
+  padding: 12px 32px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-question);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.button:not(:disabled):hover {
+  transform: translateY(-1px);
+}

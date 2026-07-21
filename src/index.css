@@ -1,0 +1,41 @@
+:root {
+  --bg: #f4f5f9;
+  --text: #1f2233;
+  --card-bg: #ffffff;
+  --border: #dcdfe6;
+
+  --color-reference: #f5c518;
+  --color-question: #3b82f6;
+  --color-reveal: #22c55e;
+
+  font: 18px/145% system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14151c;
+    --text: #e5e7eb;
+    --card-bg: #1f2028;
+    --border: #2e303a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
