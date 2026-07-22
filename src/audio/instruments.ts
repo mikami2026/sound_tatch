@@ -1,6 +1,6 @@
 import type { NoteName } from './notes';
 
-export type InstrumentId = 'triangle' | 'piano' | 'organ';
+export type InstrumentId = 'triangle' | 'piano' | 'organ' | 'violin' | 'flute' | 'trumpet';
 
 export interface EnvelopeDef {
   attackMs: number;
@@ -82,5 +82,52 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
       { ratio: 2, gain: 0.5 },
       { ratio: 4, gain: 0.25 },
     ],
+  },
+  violin: {
+    id: 'violin',
+    label: 'バイオリン風',
+    kind: 'sample',
+    // VSCO2 (Versilian Studios Chamber Orchestra, Community Edition) 由来の録音。
+    // 経由: https://github.com/nbrosowsky/tonejs-instruments (CC BY 3.0)
+    samples: [
+      { note: 'ド', url: '/samples/violin/C4.mp3' },
+      { note: 'ミ', url: '/samples/violin/E4.mp3' },
+      { note: 'ソ', url: '/samples/violin/G4.mp3' },
+      { note: 'ラ', url: '/samples/violin/A4.mp3' },
+      { note: 'ド2', url: '/samples/violin/C5.mp3' },
+    ],
+    attackMs: 15,
+    releaseMs: 200,
+  },
+  flute: {
+    id: 'flute',
+    label: 'フルート風',
+    kind: 'sample',
+    // VSCO2 (Versilian Studios Chamber Orchestra, Community Edition) 由来の録音。
+    // 経由: https://github.com/nbrosowsky/tonejs-instruments (CC BY 3.0)
+    samples: [
+      { note: 'ド', url: '/samples/flute/C4.mp3' },
+      { note: 'ミ', url: '/samples/flute/E4.mp3' },
+      { note: 'ラ', url: '/samples/flute/A4.mp3' },
+      { note: 'ド2', url: '/samples/flute/C5.mp3' },
+    ],
+    attackMs: 15,
+    releaseMs: 200,
+  },
+  trumpet: {
+    id: 'trumpet',
+    label: 'トランペット風',
+    kind: 'sample',
+    // VSCO2 (Versilian Studios Chamber Orchestra, Community Edition) 由来の録音。
+    // 経由: https://github.com/nbrosowsky/tonejs-instruments (CC BY 3.0)
+    samples: [
+      { note: 'ド', url: '/samples/trumpet/C4.mp3' },
+      { note: 'レ♯', url: '/samples/trumpet/Ds4.mp3' },
+      { note: 'ファ', url: '/samples/trumpet/F4.mp3' },
+      { note: 'ソ', url: '/samples/trumpet/G4.mp3' },
+      { note: 'ラ♯', url: '/samples/trumpet/As4.mp3' },
+    ],
+    attackMs: 10,
+    releaseMs: 150,
   },
 };

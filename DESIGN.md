@@ -34,7 +34,7 @@
 （フェーズ遷移ロジックや鍵盤UIはこの設定値を見て振る舞いを変えるだけ）。
 
 ```ts
-type InstrumentId = 'triangle' | 'piano' | 'organ'; // 音色（拡張可能なレジストリ）
+type InstrumentId = 'triangle' | 'piano' | 'organ' | 'violin' | 'flute' | 'trumpet'; // 音色（拡張可能なレジストリ）
 
 interface GameSettings {
   referenceEnabled: boolean;            // 基準音「ド」を鳴らすか（false＝絶対音感モード）
@@ -206,6 +206,26 @@ type InstrumentDef = SynthInstrumentDef | SampledInstrumentDef;
   アタック（5ms）と、発音時間終了時のリリース（300ms）だけを制御する。
   録音そのものに自然な減衰が含まれているため、synth楽器のような`decayMs`/
   `sustainLevel`の作り込みは不要。
+
+**弦楽器・木管楽器・金管楽器**（`violin`＝バイオリン風、`flute`＝フルート風、
+`trumpet`＝トランペット風）も`piano`と同じ`kind: 'sample'`方式で実装した。
+
+- 音源: [VSCO2](http://vis.versilstudios.net/vsco-community.html)（Versilian Studios
+  Chamber Orchestra, Community Edition）を、`nbrosowsky/tonejs-instruments`
+  （`github.com/nbrosowsky/tonejs-instruments`）が編集・再配布したものを取得。
+  ライセンスは**CC BY 3.0**（由来の明記が必要。`instruments.ts`のコメントに記載）。
+- 各楽器とも実際にリポジトリに存在する録音の中からC4〜C5の1オクターブに収まる
+  ものだけを選んで配置し、`sampleEngine.ts`の`nearestSample`でピッチシフト代用する
+  （piano同様、全13音を録音する必要はない）。
+  - `violin`: `C4, E4, G4, A4, C5`（5ファイル、`public/samples/violin/`）
+  - `flute`: `C4, E4, A4, C5`（4ファイル、リポジトリにG4の録音が存在しないため
+    piano/violinより1つ少ない。`nearestSample`が最も近い録音を自動選択するので
+    動作上の問題はない）
+  - `trumpet`: `C4, Ds4, F4, G4, As4`（5ファイル、C5に近い`As4`（2半音差）を
+    最後の録音として採用）
+- ダウンロード容量: 3楽器合計で約3MB（1ファイルあたり約100〜340KB。
+  piano（弦を1本はじいて減衰するのみ）と違い、弦楽器・管楽器は「音を伸ばして
+  一定持続させる」録音のため、1ファイルのサイズがpianoより大きい）。
 
 いずれの方式でも呼び出し側（`playNotes`・フェーズ制御・UI）からは同じ
 `playNotes(notes, instrumentId, durationMs)`シグネチャで呼べる。`soundEngine.playNotes`が
@@ -419,6 +439,8 @@ interface GameState {
   discriminated unionのため、`kind:'sample'`のプリセットを追加するだけで対応可能）。
 - ピアノのベロシティ（強弱）レイヤーへの対応（現在のSalamanderサンプルはmf相当の
   単一強弱のみ使用。fp/ffレイヤーも配布されているため、将来的な拡張余地あり）。
+- 打楽器（マリンバ・木琴等の音程が明確なもの）の追加は今回見送った。
+  必要になれば`violin`等と同じ`kind:'sample'`パターンで追加できる。
 - スコア・正答率・連続正解数の記録
 - 出題音域の拡張（複数オクターブへの拡張。現状はC4〜C5の1オクターブ・半音階のみ）
 - カウントダウン時間（Ver.1は1秒固定）や正解表示の秒数を難易度設定にする
