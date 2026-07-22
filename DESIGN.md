@@ -35,12 +35,14 @@
 
 ```ts
 type InstrumentId = 'triangle' | 'piano' | 'organ' | 'violin' | 'flute' | 'trumpet'; // 音色（拡張可能なレジストリ）
+type GameMode = 'listen' | 'challenge'; // 'listen'=自動で答え合わせ、'challenge'=クリックで回答
 
 interface GameSettings {
   referenceEnabled: boolean;            // 基準音「ド」を鳴らすか（false＝絶対音感モード）
   includeBlackKeys: boolean;            // 黒鍵（半音）も出題範囲に含めるか
   noteCount: 1 | 2 | 3 | 'random';      // 同時に鳴らす問題音の数（'random'は毎ラウンド抽選）
   instrument: InstrumentId | 'random';  // 音色プリセット（'random'は毎ラウンド抽選）
+  mode: GameMode;                       // きく（自動）／挑戦者
 }
 ```
 
@@ -250,6 +252,40 @@ type InstrumentDef = SynthInstrumentDef | SampledInstrumentDef;
 `playNotes(notes, instrumentId, durationMs)`シグネチャで呼べる。`soundEngine.playNotes`が
 `instrument.kind`を見てsynth/sample双方の再生ロジックに振り分ける。
 
+### 3.6 挑戦者モード（`mode: 'challenge'`）
+
+自己採点方式（`listen`）とは別に、実際に鍵盤をクリックして回答する「挑戦者」モードを
+`GameSettings.mode`で切り替えられるようにした。ルールは以下の通り:
+
+- 問題音の再生後、`countdown`/`reveal`は行わず、**回答時間無制限**の`answering`フェーズに入り
+  鍵盤がクリック可能になる（`Keyboard`の`onNoteClick`はこのフェーズのときだけ渡される）。
+- 複数音（`noteCount`が2・3）の場合、**クリックする順序は問わない**（和音に順序はないため）。
+  正解の音をクリックするたびにその鍵盤が緑になり「正解として確定」、まだ選んでいない正解音の
+  数をステータステキストに「あと◯音」と表示する。既に正解済みの音を再度クリックしても無視される
+  （ペナルティなし）。
+- 出題に含まれない音をクリックした瞬間、**即ゲームオーバー**（`gameover`フェーズ）。
+  クリックした誤答の鍵盤を赤（`--color-wrong`）で、正解だった音（未選択分も含め全て）を
+  緑で表示し、答え合わせができるようにする。
+- 1ラウンド全問正解すると`correct`フェーズ（600ms、正解表示）を経て自動的に次のラウンドへ進む
+  （`listen`モードの`reveal`→ループと同じ仕組みを流用）。このとき`streak`（連続正解ラウンド数）を
+  1増やす。
+- `streak`は「スタート」（`idle`から）または「もう一度」（`gameover`から）を押したときに0へ
+  リセットされる。どちらも内部的には同じ`start()`関数（`setStreak(0)`してから`startRound()`）。
+  ラウンドをまたぐ「正解→次のラウンド」は`startRoundRef.current()`を直接呼ぶだけで、
+  `streak`はリセットしない。
+- `NextButton`のラベルは`idle`→「スタート」、`gameover`→「もう一度」、それ以外（実行中）→
+  「とめる」の3状態。`SettingsPanel`は`idle`と`gameover`のときだけ操作可能にする
+  （`gameover`中も設定変更してから「もう一度」で新しい設定を反映できる）。
+- **もう一度聞く**: `answering`フェーズ中、1ラウンドにつき1回だけ問題音を同じ音色で
+  再生し直せる（`replayAvailable`フラグ、`useGameSequence`の`replay()`）。使用後は
+  ボタンが「聞き直しは使用済み」表示で非活性になり、次のラウンドが始まると再び使えるようになる。
+  ラウンド開始時に解決した音色（`'random'`の場合も含む）を`roundInstrumentRef`に保持し、
+  聞き直し時も同じ音色で再生することで、ラウンド途中で聞こえる音色が変わらないようにしている。
+- 実装上の注意: `useGameSequence`内の`answerNote`は、Reactの`StrictMode`が
+  `setState(prev => ...)`形式の更新関数を開発時に二重実行する挙動があるため、
+  更新関数の中でさらに`setPhase`等の副作用を呼ばない設計にしている
+  （`phaseRef`/`questionNotesRef`/`selectedNotesRef`で最新値を読み、判定はrefベースで行う）。
+
 ## 4. 状態遷移設計
 
 ```
@@ -336,10 +372,16 @@ Union型で管理し、`setTimeout`の連鎖（もしくは`useEffect`＋タイ�
 - REVEALフェーズ：正解の鍵盤（複数可）が緑に光り、それぞれラベルに音名を表示。
   複数音の場合はステータステキストにも音高順で列挙（例:「正解：ミ・ソ・シ」）。
   不正解演出はなし（自己採点のため）。
+- ANSWERINGフェーズ（挑戦者モード）：鍵盤がクリック可能になり、正解として確定した音だけが
+  緑に光る（3.6節参照）。GAMEOVERフェーズでは誤答した鍵盤が赤く光り、正解だった音
+  （未選択分も含む）が緑で示される。
 
 `Keyboard`コンポーネントは常に「アクティブな鍵盤の配列」を受け取る設計にし
-（`{ note: NoteName; color: 'yellow' | 'green' }[]`、QUESTIONフェーズは空配列を渡す）、
-1音でも複数音でも同じpropsの形で扱えるようにする（noteCountが増えても`Keyboard`自体の変更は不要）。
+（`{ note: NoteName; color: 'yellow' | 'green' | 'red' | 'none' }[]`、QUESTIONフェーズは
+空配列を渡す）、1音でも複数音でも同じpropsの形で扱えるようにする（noteCountが増えても
+`Keyboard`自体の変更は不要）。挑戦者モードでは`Keyboard`に`onNoteClick`も渡し、
+`answering`フェーズのときだけ各`Key`がクリック可能になる（それ以外は`onClick`が
+渡されず自動的に非活性のボタンになる）。
 
 ### 5.2 ステータステキスト
 
@@ -359,7 +401,11 @@ Union型で管理し、`setTimeout`の連鎖（もしくは`useEffect`＋タイ�
   一段階仕上げている。
 - ダークモードは`prefers-color-scheme: dark`に応じてCSS変数（`--bg`・`--text`・
   `--card-bg`・`--card-shadow`等）を切り替える方式（OS設定連動、手動トグルはなし）。
-  背景は`--bg-accent`から`--bg`への薄いグラデーションにして、単色よりも奥行きを出す。
+- 背景はピンク・オレンジ・紫・青・シアンを画面の角に配置したradial-gradientの
+  重ねがけ（`body`の`background-image`）。ダークモードでは同じ色相のまま不透明度を
+  落として深みのある発光感を出す。加えて`BackgroundNotes`コンポーネントが
+  ♪♫♬・ト音記号・シャープ/フラットを固定レイアウトで散りばめ、
+  `pointer-events: none`でクリックを妨げないようにしている。
 
 ## 6. コンポーネント構成
 
@@ -373,14 +419,15 @@ src/
  │   ├─ sampleEngine.ts      … サンプル音源の読み込み・キャッシュ・ピッチシフト再生
  │   └─ soundEngine.ts       … Web Audio APIラッパー（playNotes関数。synth/sample振り分け）
  ├─ hooks/
- │   └─ useGameSequence.ts   … フェーズ遷移＆タイマーを管理するカスタムフック
+ │   └─ useGameSequence.ts   … フェーズ遷移＆タイマー・挑戦者モードの回答判定を管理するカスタムフック
  ├─ components/
- │   ├─ SettingsPanel.tsx    … 基準音オン/オフ・黒鍵オン/オフ・音数・音色の設定UI
+ │   ├─ SettingsPanel.tsx    … モード・基準音オン/オフ・黒鍵オン/オフ・音数・音色の設定UI
  │   │                          （音数/音色は「ランダム」選択も可能）
- │   ├─ StatusText.tsx       … フェーズごとの案内テキスト
- │   ├─ Keyboard.tsx         … 白鍵15＋黒鍵10の鍵盤表示（発光状態をpropsで受け取る）
- │   ├─ Key.tsx              … 鍵盤1つ分（白鍵/黒鍵のvariant・色・ラベル・アニメーション）
- │   └─ NextButton.tsx       … スタート/とめるボタン（常時活性、ループのON/OFFを切り替え）
+ │   ├─ StatusText.tsx       … フェーズごとの案内テキスト・連続正解数（挑戦者モード）
+ │   ├─ Keyboard.tsx         … 白鍵15＋黒鍵10の鍵盤表示（発光状態・クリックをpropsで受け取る）
+ │   ├─ Key.tsx              … 鍵盤1つ分（白鍵/黒鍵のvariant・色・ラベル・アニメーション・クリック）
+ │   ├─ NextButton.tsx       … スタート/とめる/もう一度ボタン（常時活性、ラベルはphaseで切替）
+ │   └─ BackgroundNotes.tsx  … 背景の音符・記号装飾（pointer-events:none）
  └─ styles/
      └─ *.module.css
 ```
@@ -394,13 +441,17 @@ type NoteName =
   | 'ソ' | 'ソ♯' | 'ラ' | 'ラ♯' | 'シ'
   | 'ド2' | 'ド♯2' | 'レ2' | 'レ♯2' | 'ミ2' | 'ファ2' | 'ファ♯2'
   | 'ソ2' | 'ソ♯2' | 'ラ2' | 'ラ♯2' | 'シ2' | 'ド3';
-type Phase = 'reference' | 'gap' | 'question' | 'countdown' | 'reveal';
+type Phase =
+  | 'reference' | 'gap' | 'question' | 'countdown' | 'reveal'  // listenモード
+  | 'answering' | 'correct' | 'gameover';                       // challengeモード
 type InstrumentId = 'triangle' | 'piano' | 'organ' | 'violin' | 'flute' | 'trumpet';
+type GameMode = 'listen' | 'challenge';
 
 interface GameSettings {
   referenceEnabled: boolean;
   includeBlackKeys: boolean;
   noteCount: 1 | 2 | 3 | 'random';
+  mode: GameMode;
   instrument: InstrumentId | 'random';
 }
 
@@ -432,11 +483,13 @@ interface GameState {
 
 ### 6.3 SettingsPanel.tsx の責務
 
-- `GameSettings`を受け取り、`referenceEnabled`・`includeBlackKeys`のチェックボックス、
-  `noteCount`（1音/2音/3音/ランダム）と`instrument`（基本/ピアノ風/オルガン風/ランダム）の
-  セグメントボタンを表示する。`instrument`の選択肢は`instruments.ts`の`INSTRUMENTS`
-  レジストリから動的に生成するため、楽器を追加する際もこのコンポーネントの変更は不要。
-- `phase !== 'idle'`のあいだは`disabled`にし、ラウンド進行中に設定が変わらないようにする。
+- `GameSettings`を受け取り、`mode`（きく/挑戦者）・`referenceEnabled`・`includeBlackKeys`の
+  チェックボックス、`noteCount`（1音/2音/3音/ランダム）と`instrument`（基本/ピアノ風/オルガン風/
+  ランダム）のセグメントボタンを表示する。`instrument`の選択肢は`instruments.ts`の
+  `INSTRUMENTS`レジストリから動的に生成するため、楽器を追加する際もこのコンポーネントの変更は不要。
+- `disabled`（App.tsx側で`phase`が`idle`・`gameover`以外のときtrue）のあいだは
+  各コントロールを`disabled`にし、ラウンド進行中に設定が変わらないようにする。
+  `gameover`中は操作可能にし、「もう一度」を押す前に設定を変えられるようにしている。
 - 変更は`onChange(next: GameSettings)`でApp.tsx側のstateに反映し、次回の`start()`から
   新しい設定が使われる。
 
@@ -450,8 +503,11 @@ interface GameState {
 - 鍵盤全体の幅（15鍵分）は画面幅を超えることがあるため、`.keyboardScroll`
   （`overflow-x: auto`）でラップし、狭い画面では横スクロールできるようにしている。
 - `Key`は`variant: 'white' | 'black'`を受け取り、既定の見た目（白鍵は明るい枠、
-  黒鍵は暗色＋影）を切り替える。`color`（'none'/'yellow'/'green'）は`variant`に関わらず
+  黒鍵は暗色＋影）を切り替える。`color`（'none'/'yellow'/'green'/'red'）は`variant`に関わらず
   共通のハイライト色として上書き適用される。
+- `Key`は実体としては`<button>`（`onClick`が渡されないときは`disabled`）。挑戦者モードの
+  `answering`フェーズでのみ`Keyboard`から実際のクリックハンドラが渡され、それ以外の
+  フェーズでは非活性ボタンとしてレンダリングされる（クリックしても何も起きない）。
 
 ## 7. 非機能・注意点
 
@@ -477,7 +533,8 @@ interface GameState {
   単一強弱のみ使用。fp/ffレイヤーも配布されているため、将来的な拡張余地あり）。
 - 打楽器（マリンバ・木琴等の音程が明確なもの）の追加は今回見送った。
   必要になれば`violin`等と同じ`kind:'sample'`パターンで追加できる。
-- スコア・正答率・連続正解数の記録
+- 挑戦者モードの連続正解数（`streak`）は現在ページ内のstateのみで、リロードすると消える。
+  ベストスコアの永続化（localStorage等）は未実装。
 - さらなる音域拡張（現状はC4〜C6の2オクターブ・半音階。3オクターブ目以降は
   一部楽器のサンプル録音が不足するため、拡張時は楽器ごとの対応録音の有無を要確認）
 - カウントダウン時間（Ver.1は1秒固定）や正解表示の秒数を難易度設定にする

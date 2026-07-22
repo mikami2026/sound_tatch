@@ -42,4 +42,5 @@
 .blackKeySlot {
   position: absolute;
   top: 0;
+  pointer-events: auto;
 }

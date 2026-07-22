@@ -35,3 +35,27 @@
   align-items: center;
   gap: 28px;
 }
+
+.replayButton {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 8px 24px;
+  border-radius: 999px;
+  border: 2px solid var(--color-question);
+  background: transparent;
+  color: var(--color-question);
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.replayButton:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.replayButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-color: var(--border);
+  color: var(--text-muted);
+}

@@ -11,6 +11,7 @@ export interface ActiveKey {
 interface KeyboardProps {
   activeKeys: ActiveKey[];
   includeBlackKeys: boolean;
+  onNoteClick?: (note: NoteName) => void;
 }
 
 // 黒鍵は「直前の白鍵（0始まりのインデックス）」の右側に配置する。
@@ -34,7 +35,7 @@ const WHITE_KEY_GAP = 6;
 const WHITE_KEY_PITCH = WHITE_KEY_WIDTH + WHITE_KEY_GAP;
 const BLACK_KEY_WIDTH = 24;
 
-export function Keyboard({ activeKeys, includeBlackKeys }: KeyboardProps) {
+export function Keyboard({ activeKeys, includeBlackKeys, onNoteClick }: KeyboardProps) {
   const findActive = (note: NoteName) => activeKeys.find((k) => k.note === note);
 
   return (
@@ -49,6 +50,7 @@ export function Keyboard({ activeKeys, includeBlackKeys }: KeyboardProps) {
                 variant="white"
                 color={active?.color ?? 'none'}
                 displayLabel={active?.label ?? baseDegreeLabel(note)}
+                onClick={onNoteClick ? () => onNoteClick(note) : undefined}
               />
             );
           })}
@@ -69,6 +71,7 @@ export function Keyboard({ activeKeys, includeBlackKeys }: KeyboardProps) {
                     variant="black"
                     color={active?.color ?? 'none'}
                     displayLabel={active?.label ?? baseDegreeLabel(note)}
+                    onClick={onNoteClick ? () => onNoteClick(note) : undefined}
                   />
                 </div>
               );

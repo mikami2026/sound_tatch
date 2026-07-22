@@ -3,7 +3,18 @@ import { pickRandomNotes, NOTE_ORDER, WHITE_NOTE_ORDER, type NoteName } from '..
 import { playNotes } from '../audio/soundEngine';
 import { INSTRUMENTS, type InstrumentId } from '../audio/instruments';
 
-export type Phase = 'idle' | 'reference' | 'gap' | 'question' | 'countdown' | 'reveal';
+export type Phase =
+  | 'idle'
+  | 'reference'
+  | 'gap'
+  | 'question'
+  | 'countdown'
+  | 'reveal'
+  | 'answering'
+  | 'correct'
+  | 'gameover';
+
+export type GameMode = 'listen' | 'challenge';
 
 const NOTE_COUNT_CHOICES = [1, 2, 3] as const;
 const INSTRUMENT_CHOICES = Object.keys(INSTRUMENTS) as InstrumentId[];
@@ -13,6 +24,7 @@ export interface GameSettings {
   includeBlackKeys: boolean;
   noteCount: 1 | 2 | 3 | 'random';
   instrument: InstrumentId | 'random';
+  mode: GameMode; // 'listen'=自動で答え合わせ、'challenge'=クリックで回答し間違えたら終了
 }
 
 const REFERENCE_NOTE: NoteName = 'ド';
@@ -21,6 +33,7 @@ const GAP_DURATION_MS = 300;
 const QUESTION_DURATION_MS = 900;
 const THINKING_DURATION_MS = 1000;
 const REVEAL_DISPLAY_MS = 2000;
+const CORRECT_DISPLAY_MS = 600;
 
 function pickFrom<T>(choices: readonly T[]): T {
   return choices[Math.floor(Math.random() * choices.length)];
@@ -29,10 +42,31 @@ function pickFrom<T>(choices: readonly T[]): T {
 export function useGameSequence(settings: GameSettings) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [questionNotes, setQuestionNotes] = useState<NoteName[]>([]);
+  const [selectedNotes, setSelectedNotes] = useState<NoteName[]>([]);
+  const [wrongNote, setWrongNote] = useState<NoteName | null>(null);
+  const [streak, setStreak] = useState(0);
+  const [replayAvailable, setReplayAvailable] = useState(false);
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  // イベントハンドラ（answerNote）から常に最新値を読むためのref。
+  // Strict Modeはstateの関数形更新（setState(prev => ...)）を副作用検査のため
+  // 二重実行することがあるため、副作用（setPhase等）はref経由の値で判定し、
+  // 更新関数の中には入れない設計にしている。
+  const phaseRef = useRef<Phase>('idle');
+  phaseRef.current = phase;
+  const questionNotesRef = useRef<NoteName[]>([]);
+  questionNotesRef.current = questionNotes;
+  const selectedNotesRef = useRef<NoteName[]>([]);
+  selectedNotesRef.current = selectedNotes;
+  const replayAvailableRef = useRef(false);
+  replayAvailableRef.current = replayAvailable;
+
+  // そのラウンドの問題再生に使った音色（'random'解決後の実際の値）を覚えておき、
+  // 「もう一度聞く」でも同じ音色で再生できるようにする。
+  const roundInstrumentRef = useRef<InstrumentId>('triangle');
 
   const clearTimers = useCallback(() => {
     timers.current.forEach(clearTimeout);
@@ -53,6 +87,9 @@ export function useGameSequence(settings: GameSettings) {
   const startRound = useCallback(() => {
     clearTimers();
     const current = settingsRef.current;
+    setSelectedNotes([]);
+    setWrongNote(null);
+    setReplayAvailable(false);
 
     // 「ランダム」設定はラウンド開始時に1回だけ解決し、基準音・問題音の両方で
     // 同じ音色を使う（ラウンドの途中で音色が変わると比較にならないため）。
@@ -61,6 +98,7 @@ export function useGameSequence(settings: GameSettings) {
       current.instrument === 'random' ? pickFrom(INSTRUMENT_CHOICES) : current.instrument;
     const pool = current.includeBlackKeys ? NOTE_ORDER : WHITE_NOTE_ORDER;
 
+    roundInstrumentRef.current = instrument;
     const notes = pickRandomNotes(noteCount, pool);
     setQuestionNotes(notes);
 
@@ -68,12 +106,19 @@ export function useGameSequence(settings: GameSettings) {
       setPhase('question');
       playNotes(notes, instrument, QUESTION_DURATION_MS);
       schedule(() => {
-        setPhase('countdown');
-        schedule(() => {
-          setPhase('reveal');
-          // ユーザー操作を待たず、一定時間表示したら自動で次のラウンドへ進む
-          schedule(() => startRoundRef.current(), REVEAL_DISPLAY_MS);
-        }, THINKING_DURATION_MS);
+        if (current.mode === 'challenge') {
+          // 挑戦者モードは回答時間無制限。鍵盤クリック（answerNote）を待つ。
+          // 「もう一度聞く」は1ラウンドにつき1回だけ使える。
+          setReplayAvailable(true);
+          setPhase('answering');
+        } else {
+          setPhase('countdown');
+          schedule(() => {
+            setPhase('reveal');
+            // ユーザー操作を待たず、一定時間表示したら自動で次のラウンドへ進む
+            schedule(() => startRoundRef.current(), REVEAL_DISPLAY_MS);
+          }, THINKING_DURATION_MS);
+        }
       }, QUESTION_DURATION_MS);
     };
 
@@ -93,10 +138,63 @@ export function useGameSequence(settings: GameSettings) {
     startRoundRef.current = startRound;
   }, [startRound]);
 
+  // 「スタート」（idleから）と「もう一度」（gameoverから）は同じ動作:
+  // 連続正解数をリセットして新しい挑戦を始める。
+  const start = useCallback(() => {
+    setStreak(0);
+    startRound();
+  }, [startRound]);
+
   const stop = useCallback(() => {
     clearTimers();
     setPhase('idle');
   }, [clearTimers]);
 
-  return { phase, questionNotes, start: startRound, stop };
+  // 挑戦者モードで鍵盤をクリックしたときの回答判定。
+  const answerNote = useCallback(
+    (note: NoteName) => {
+      if (phaseRef.current !== 'answering') return;
+      const notes = questionNotesRef.current;
+
+      if (!notes.includes(note)) {
+        clearTimers();
+        setWrongNote(note);
+        setPhase('gameover');
+        return;
+      }
+
+      if (selectedNotesRef.current.includes(note)) return; // 既に正解済みの音は無視
+
+      const next = [...selectedNotesRef.current, note];
+      setSelectedNotes(next);
+
+      if (next.length === notes.length) {
+        // 全音正解: 少し表示してから自動で次のラウンドへ
+        setStreak((s) => s + 1);
+        setPhase('correct');
+        schedule(() => startRoundRef.current(), CORRECT_DISPLAY_MS);
+      }
+    },
+    [clearTimers, schedule],
+  );
+
+  // 挑戦者モード用「もう一度聞く」。1ラウンドにつき1回だけ、同じ音色・同じ問題音を再生する。
+  const replay = useCallback(() => {
+    if (phaseRef.current !== 'answering' || !replayAvailableRef.current) return;
+    setReplayAvailable(false);
+    playNotes(questionNotesRef.current, roundInstrumentRef.current, QUESTION_DURATION_MS);
+  }, []);
+
+  return {
+    phase,
+    questionNotes,
+    selectedNotes,
+    wrongNote,
+    streak,
+    replayAvailable,
+    start,
+    stop,
+    answerNote,
+    replay,
+  };
 }

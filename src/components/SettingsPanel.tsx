@@ -10,10 +10,31 @@ interface SettingsPanelProps {
 
 const NOTE_COUNT_OPTIONS = [1, 2, 3, 'random'] as const;
 const INSTRUMENT_OPTIONS = [...Object.values(INSTRUMENTS), { id: 'random' as const, label: 'ランダム' }];
+const MODE_OPTIONS: { id: GameSettings['mode']; label: string }[] = [
+  { id: 'listen', label: 'きく（自動）' },
+  { id: 'challenge', label: '挑戦者' },
+];
 
 export function SettingsPanel({ settings, onChange, disabled }: SettingsPanelProps) {
   return (
     <div className={styles.panel}>
+      <div className={styles.noteCountRow}>
+        <span className={styles.noteCountLabel}>モード</span>
+        <div className={styles.segmented}>
+          {MODE_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={option.id === settings.mode ? styles.segmentActive : styles.segment}
+              disabled={disabled}
+              onClick={() => onChange({ ...settings, mode: option.id })}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <label className={styles.toggleRow}>
         <input
           type="checkbox"

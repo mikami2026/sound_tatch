@@ -14,9 +14,15 @@ const INITIAL_SETTINGS: GameSettings = {
   includeBlackKeys: false,
   noteCount: 1,
   instrument: 'triangle',
+  mode: 'listen',
 };
 
-function buildActiveKeys(phase: Phase, questionNotes: NoteName[]): ActiveKey[] {
+function buildActiveKeys(
+  phase: Phase,
+  questionNotes: NoteName[],
+  selectedNotes: NoteName[],
+  wrongNote: NoteName | null,
+): ActiveKey[] {
   switch (phase) {
     case 'reference':
       return [{ note: 'ド', color: 'yellow', label: 'ド' }];
@@ -25,11 +31,30 @@ function buildActiveKeys(phase: Phase, questionNotes: NoteName[]): ActiveKey[] {
       // 鍵盤にヒントを出さない（光らせると答えが分かってしまうため）
       return [];
     case 'reveal':
+    case 'correct':
       return questionNotes.map((note) => ({
         note,
         color: 'green',
         label: baseDegreeLabel(note),
       }));
+    case 'answering':
+      // 挑戦者モード: これまでに正解した音だけを緑で表示（正解の進捗表示）
+      return selectedNotes.map((note) => ({
+        note,
+        color: 'green',
+        label: baseDegreeLabel(note),
+      }));
+    case 'gameover': {
+      const keys: ActiveKey[] = questionNotes.map((note) => ({
+        note,
+        color: 'green',
+        label: baseDegreeLabel(note),
+      }));
+      if (wrongNote) {
+        keys.push({ note: wrongNote, color: 'red', label: baseDegreeLabel(wrongNote) });
+      }
+      return keys;
+    }
     default:
       return [];
   }
@@ -37,11 +62,27 @@ function buildActiveKeys(phase: Phase, questionNotes: NoteName[]): ActiveKey[] {
 
 function App() {
   const [settings, setSettings] = useState<GameSettings>(INITIAL_SETTINGS);
-  const { phase, questionNotes, start, stop } = useGameSequence(settings);
+  const {
+    phase,
+    questionNotes,
+    selectedNotes,
+    wrongNote,
+    streak,
+    replayAvailable,
+    start,
+    stop,
+    answerNote,
+    replay,
+  } = useGameSequence(settings);
 
-  const activeKeys = useMemo(() => buildActiveKeys(phase, questionNotes), [phase, questionNotes]);
+  const activeKeys = useMemo(
+    () => buildActiveKeys(phase, questionNotes, selectedNotes, wrongNote),
+    [phase, questionNotes, selectedNotes, wrongNote],
+  );
 
-  const isRunning = phase !== 'idle';
+  const isIdle = phase === 'idle';
+  const isGameOver = phase === 'gameover';
+  const isRunning = !isIdle && !isGameOver;
 
   useEffect(() => {
     // ピアノ音源（サンプル音声）はネットワーク読み込みが必要なため、
@@ -57,14 +98,35 @@ function App() {
       <div className={styles.stage}>
         <SettingsPanel settings={settings} onChange={setSettings} disabled={isRunning} />
 
-        <StatusText phase={phase} questionNotes={questionNotes} />
+        <StatusText
+          phase={phase}
+          questionNotes={questionNotes}
+          selectedNotes={selectedNotes}
+          mode={settings.mode}
+          streak={streak}
+        />
 
-        <Keyboard activeKeys={activeKeys} includeBlackKeys={settings.includeBlackKeys} />
+        <Keyboard
+          activeKeys={activeKeys}
+          includeBlackKeys={settings.includeBlackKeys}
+          onNoteClick={phase === 'answering' ? answerNote : undefined}
+        />
+
+        {settings.mode === 'challenge' && !isIdle && (
+          <button
+            type="button"
+            className={styles.replayButton}
+            disabled={!(phase === 'answering' && replayAvailable)}
+            onClick={replay}
+          >
+            {phase === 'answering' && !replayAvailable ? '聞き直しは使用済み' : 'もう一度聞く'}
+          </button>
+        )}
 
         <NextButton
-          label={isRunning ? 'とめる' : 'スタート'}
+          label={isIdle ? 'スタート' : isGameOver ? 'もう一度' : 'とめる'}
           disabled={false}
-          onClick={isRunning ? stop : start}
+          onClick={isIdle || isGameOver ? start : stop}
         />
       </div>
     </div>
