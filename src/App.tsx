@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { BackgroundNotes } from './components/BackgroundNotes';
 import { Keyboard, type ActiveKey } from './components/Keyboard';
 import { StatusText } from './components/StatusText';
 import { NextButton } from './components/NextButton';
@@ -50,6 +51,7 @@ function App() {
 
   return (
     <div className={styles.app}>
+      <BackgroundNotes />
       <h1 className={styles.title}>音あてゲーム</h1>
 
       <div className={styles.stage}>
