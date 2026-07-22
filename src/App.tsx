@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BackgroundNotes } from './components/BackgroundNotes';
+import { Footer } from './components/Footer';
 import { Keyboard, type ActiveKey } from './components/Keyboard';
 import { StatusText } from './components/StatusText';
 import { NextButton } from './components/NextButton';
@@ -129,6 +130,8 @@ function App() {
           onClick={isIdle || isGameOver ? start : stop}
         />
       </div>
+
+      <Footer />
     </div>
   );
 }

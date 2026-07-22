@@ -1,0 +1,12 @@
+.footer {
+  margin-top: 24px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: 100%;
+}
+
+.footer a {
+  color: inherit;
+  text-decoration: underline;
+}
