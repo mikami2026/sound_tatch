@@ -58,15 +58,18 @@ interface GameSettings {
 
 ### 3.1 音階と周波数
 
-1オクターブ・半音階（C4〜C5、平均律 A4=440Hz基準）。周波数は
+2オクターブ・半音階（C4〜C6、平均律 A4=440Hz基準）。周波数は
 `C4 = 440 / 2^(9/12)` を起点に、半音ごとに `2^(1/12)` を掛けて算出する
 （`notes.ts`でハードコードせずプログラム的に生成し、転記ミスや将来のオクターブ拡張に強くする）。
 
 「ド（C4）」は常に基準音として使用する。出題音は `includeBlackKeys` の設定に応じて
 以下いずれかのプールからランダムに選ぶ（基準音と同じ「ド」が出題される場合もあり）。
 
-- `includeBlackKeys: false`（既定）→ 白鍵8音（`WHITE_NOTE_ORDER`）
-- `includeBlackKeys: true` → 白鍵＋黒鍵の13音（`NOTE_ORDER`）
+- `includeBlackKeys: false`（既定）→ 白鍵15音（`WHITE_NOTE_ORDER`）
+- `includeBlackKeys: true` → 白鍵＋黒鍵の25音（`NOTE_ORDER`）
+
+`NoteName`は末尾の数字でオクターブを表す（末尾なし＝C4〜B4のオクターブ4、
+「2」＝C5〜B5のオクターブ5、「3」＝2オクターブ上の境界音C6のみ）。
 
 | 音名 | 種別 | 周波数(Hz) |
 |---|---|---|
@@ -82,9 +85,26 @@ interface GameSettings {
 | ラ (A4) | 白鍵 | 440.00 |
 | ラ♯ (A#4) | 黒鍵 | 466.16 |
 | シ (B4) | 白鍵 | 493.88 |
-| ド (C5) | 白鍵 | 523.25 |
+| ド2 (C5) | 白鍵 | 523.25 |
+| ド♯2 (C#5) | 黒鍵 | 554.37 |
+| レ2 (D5) | 白鍵 | 587.33 |
+| レ♯2 (D#5) | 黒鍵 | 622.25 |
+| ミ2 (E5) | 白鍵 | 659.26 |
+| ファ2 (F5) | 白鍵 | 698.46 |
+| ファ♯2 (F#5) | 黒鍵 | 739.99 |
+| ソ2 (G5) | 白鍵 | 783.99 |
+| ソ♯2 (G#5) | 黒鍵 | 830.61 |
+| ラ2 (A5) | 白鍵 | 880.00 |
+| ラ♯2 (A#5) | 黒鍵 | 932.33 |
+| シ2 (B5) | 白鍵 | 987.77 |
+| ド3 (C6) | 白鍵 | 1046.50 |
 
-ミ→ファ、シ→ド の間には黒鍵が存在しない（実際の鍵盤配列と同じ）。
+ミ→ファ、シ→ド の間には黒鍵が存在しない（実際の鍵盤配列と同じ）。この規則は
+オクターブが変わっても同じパターンで繰り返される。
+
+鍵盤・正解表示のラベルはオクターブの数字を表示せず音名だけを示す（`baseDegreeLabel`）。
+ただしテキストでの正解発表（`StatusText`）は「ド」と「ド2」が区別できないと紛らわしいため、
+`displayLabel`でオクターブ5の音には「（高）」、`ド3`には「（最高）」を付けて区別する。
 
 ### 3.2 音色・エンベロープ
 
@@ -117,7 +137,7 @@ REVEALの表示時間（2000ms）が経過すると、ユーザー操作なし�
 
 ### 3.4 複数音同時出題（2音・3音）の音生成ロジック
 
-- 出題音は選択中のプール（白鍵8音、または黒鍵を含む13音）から重複なしで
+- 出題音は選択中のプール（白鍵15音、または黒鍵を含む25音）から重複なしで
   `noteCount`個をランダム抽出する。
 - `soundEngine.playNotes(notes: NoteName[], instrument: InstrumentId, durationMs)` が
   各音について個別のOscillatorNodeを生成し、**同一の`startTime`**で`start()`することで同時再生する
@@ -190,12 +210,12 @@ type InstrumentDef = SynthInstrumentDef | SampledInstrumentDef;
   （Alexander Holm制作、**CC BY 3.0**）を、Tone.jsが配布用に再エンコードした
   `github.com/Tonejs/audio` から取得。ライセンス上、由来の明記が必要
   （`instruments.ts`のコメントとこのDESIGN.mdに記載）。
-- C4〜C5の1オクターブに対し、5つの録音（`C4`, `D#4`, `F#4`, `A4`, `C5`）のみを
-  `public/samples/piano/`に配置。残りの8音は**再生速度（`playbackRate`）を
-  半音差に応じて`2^(semitone/12)`倍する**ことでピッチシフトして代用する
-  （`sampleEngine.ts`の`nearestSample`が音名ごとに一番近い録音を選ぶ）。
-  全13音を録音するのではなく少数のサンプルからピッチシフトで賄うことで、
-  ダウンロード容量（実測: 5ファイル合計 約350KB）を抑えている。
+- C4〜C6の2オクターブに対し、9つの録音（`C4`, `D#4`, `F#4`, `A4`, `C5`, `D#5`,
+  `F#5`, `A5`, `C6`）のみを`public/samples/piano/`に配置。残りの音は**再生速度
+  （`playbackRate`）を半音差に応じて`2^(semitone/12)`倍する**ことでピッチシフトして
+  代用する（`sampleEngine.ts`の`nearestSample`が音名ごとに一番近い録音を選ぶ）。
+  全25音を録音するのではなく少数のサンプルからピッチシフトで賄うことで、
+  ダウンロード容量を抑えている。
 - 読み込み: `fetch` + `AudioContext.decodeAudioData`でmp3を`AudioBuffer`にデコードし、
   `instrumentId`ごとにモジュールスコープのPromiseとしてキャッシュする
   （`sampleEngine.ts`の`loadBuffers`。一度読み込めば再取得しない）。
@@ -214,16 +234,15 @@ type InstrumentDef = SynthInstrumentDef | SampledInstrumentDef;
   Chamber Orchestra, Community Edition）を、`nbrosowsky/tonejs-instruments`
   （`github.com/nbrosowsky/tonejs-instruments`）が編集・再配布したものを取得。
   ライセンスは**CC BY 3.0**（由来の明記が必要。`instruments.ts`のコメントに記載）。
-- 各楽器とも実際にリポジトリに存在する録音の中からC4〜C5の1オクターブに収まる
+- 各楽器とも実際にリポジトリに存在する録音の中からC4〜C6の2オクターブに収まる
   ものだけを選んで配置し、`sampleEngine.ts`の`nearestSample`でピッチシフト代用する
-  （piano同様、全13音を録音する必要はない）。
-  - `violin`: `C4, E4, G4, A4, C5`（5ファイル、`public/samples/violin/`）
-  - `flute`: `C4, E4, A4, C5`（4ファイル、リポジトリにG4の録音が存在しないため
-    piano/violinより1つ少ない。`nearestSample`が最も近い録音を自動選択するので
+  （piano同様、全25音を録音する必要はない）。
+  - `violin`: `C4, E4, G4, A4, C5, E5, G5, A5, C6`（9ファイル、`public/samples/violin/`）
+  - `flute`: `C4, E4, A4, C5, E5, A5, C6`（7ファイル。リポジトリにG音の録音が
+    存在しないためviolinより少ない。`nearestSample`が最も近い録音を自動選択するので
     動作上の問題はない）
-  - `trumpet`: `C4, Ds4, F4, G4, As4`（5ファイル、C5に近い`As4`（2半音差）を
-    最後の録音として採用）
-- ダウンロード容量: 3楽器合計で約3MB（1ファイルあたり約100〜340KB。
+  - `trumpet`: `C4, Ds4, F4, G4, As4, D5, F5, A5, C6`（9ファイル）
+- ダウンロード容量: 3楽器合計で約5.5MB（1ファイルあたり約100〜340KB。
   piano（弦を1本はじいて減衰するのみ）と違い、弦楽器・管楽器は「音を伸ばして
   一定持続させる」録音のため、1ファイルのサイズがpianoより大きい）。
 
@@ -300,9 +319,11 @@ Union型で管理し、`setTimeout`の連鎖（もしくは`useEffect`＋タイ�
 
 ### 5.1 鍵盤コンポーネント（視覚の中心）
 
-- 白鍵8つを横並びで常時表示し、`includeBlackKeys`が有効なときは黒鍵5つを
-  白鍵の間（境界の直上）に絶対配置で重ねる、実物のピアノに近いレイアウト。
+- 白鍵15つ（2オクターブ分）を横並びで常時表示し、`includeBlackKeys`が有効なときは
+  黒鍵10つを白鍵の間（境界の直上）に絶対配置で重ねる、実物のピアノに近いレイアウト。
   黒鍵は白鍵より幅・高さを小さくし、暗色の見た目で視覚的に区別する。
+- 鍵盤全体の幅は画面より広くなり得るため、`.keyboardScroll`でラップして
+  横スクロール可能にする（狭い画面でも鍵盤を潰さずに済む）。
 - `includeBlackKeys`が無効なときは黒鍵自体を描画しない（出題されない音を
   鍵盤上に表示しても紛らわしいだけのため）。
 - REFERENCEフェーズ：「ド」の鍵盤が黄色く光り、ラベル「ド」を表示（`referenceEnabled:false`時はスキップ）。
@@ -331,6 +352,14 @@ Union型で管理し、`setTimeout`の連鎖（もしくは`useEffect`＋タイ�
   （鍵盤の色そのものが答えのヒントになってしまうため、QUESTION/COUNTDOWN中は
   全鍵盤を同じ見た目のままにする）。
 - 基準音再生中は該当鍵盤に `scale(1.05)` + box-shadow のパルスアニメーション。
+- フォントはGoogle Fonts「Zen Maru Gothic」（丸みのある親しみやすい書体）を
+  `index.html`で読み込み、`index.css`の`:root`に設定。タイトルはグラデーション
+  文字色＋太字（900）、カードには`--card-shadow`による柔らかい影を付け、
+  「スタート/とめる」ボタンもグラデーション背景にすることで単調な配色から
+  一段階仕上げている。
+- ダークモードは`prefers-color-scheme: dark`に応じてCSS変数（`--bg`・`--text`・
+  `--card-bg`・`--card-shadow`等）を切り替える方式（OS設定連動、手動トグルはなし）。
+  背景は`--bg-accent`から`--bg`への薄いグラデーションにして、単色よりも奥行きを出す。
 
 ## 6. コンポーネント構成
 
@@ -349,7 +378,7 @@ src/
  │   ├─ SettingsPanel.tsx    … 基準音オン/オフ・黒鍵オン/オフ・音数・音色の設定UI
  │   │                          （音数/音色は「ランダム」選択も可能）
  │   ├─ StatusText.tsx       … フェーズごとの案内テキスト
- │   ├─ Keyboard.tsx         … 白鍵8＋黒鍵5の鍵盤表示（発光状態をpropsで受け取る）
+ │   ├─ Keyboard.tsx         … 白鍵15＋黒鍵10の鍵盤表示（発光状態をpropsで受け取る）
  │   ├─ Key.tsx              … 鍵盤1つ分（白鍵/黒鍵のvariant・色・ラベル・アニメーション）
  │   └─ NextButton.tsx       … スタート/とめるボタン（常時活性、ループのON/OFFを切り替え）
  └─ styles/
@@ -359,11 +388,14 @@ src/
 ### 6.1 主要な型定義（イメージ）
 
 ```ts
+// 「2」は1オクターブ上、「3」は2オクターブ上の境界音（C6）のみ
 type NoteName =
   | 'ド' | 'ド♯' | 'レ' | 'レ♯' | 'ミ' | 'ファ' | 'ファ♯'
-  | 'ソ' | 'ソ♯' | 'ラ' | 'ラ♯' | 'シ' | 'ド2';
+  | 'ソ' | 'ソ♯' | 'ラ' | 'ラ♯' | 'シ'
+  | 'ド2' | 'ド♯2' | 'レ2' | 'レ♯2' | 'ミ2' | 'ファ2' | 'ファ♯2'
+  | 'ソ2' | 'ソ♯2' | 'ラ2' | 'ラ♯2' | 'シ2' | 'ド3';
 type Phase = 'reference' | 'gap' | 'question' | 'countdown' | 'reveal';
-type InstrumentId = 'triangle' | 'piano' | 'organ';
+type InstrumentId = 'triangle' | 'piano' | 'organ' | 'violin' | 'flute' | 'trumpet';
 
 interface GameSettings {
   referenceEnabled: boolean;
@@ -410,9 +442,13 @@ interface GameState {
 
 ### 6.4 Keyboard.tsx / Key.tsx の責務
 
-- `Keyboard`は白鍵8つを`WHITE_NOTE_ORDER`で横並びに描画し、`includeBlackKeys`が
-  真のときのみ黒鍵5つを絶対配置で重ねる。黒鍵の位置は「直前の白鍵インデックス」から
-  ピクセル単位で計算する（白鍵幅・間隔を定数化し、境界の中央に配置）。
+- `Keyboard`は白鍵15つを`WHITE_NOTE_ORDER`で横並びに描画し、`includeBlackKeys`が
+  真のときのみ黒鍵10個を絶対配置で重ねる。黒鍵の位置は「直前の白鍵インデックス」から
+  ピクセル単位で計算する（白鍵幅・間隔を定数化し、境界の中央に配置）。オクターブが
+  増えても`BLACK_KEYS`に同じ「ド♯・レ♯・ファ♯・ソ♯・ラ♯」パターンを
+  インデックスをずらして追加するだけで対応できる。
+- 鍵盤全体の幅（15鍵分）は画面幅を超えることがあるため、`.keyboardScroll`
+  （`overflow-x: auto`）でラップし、狭い画面では横スクロールできるようにしている。
 - `Key`は`variant: 'white' | 'black'`を受け取り、既定の見た目（白鍵は明るい枠、
   黒鍵は暗色＋影）を切り替える。`color`（'none'/'yellow'/'green'）は`variant`に関わらず
   共通のハイライト色として上書き適用される。
@@ -442,7 +478,8 @@ interface GameState {
 - 打楽器（マリンバ・木琴等の音程が明確なもの）の追加は今回見送った。
   必要になれば`violin`等と同じ`kind:'sample'`パターンで追加できる。
 - スコア・正答率・連続正解数の記録
-- 出題音域の拡張（複数オクターブへの拡張。現状はC4〜C5の1オクターブ・半音階のみ）
+- さらなる音域拡張（現状はC4〜C6の2オクターブ・半音階。3オクターブ目以降は
+  一部楽器のサンプル録音が不足するため、拡張時は楽器ごとの対応録音の有無を要確認）
 - カウントダウン時間（Ver.1は1秒固定）や正解表示の秒数を難易度設定にする
 - 効果音・BGMの追加
 - 「ランダム」設定で実際に採用された音数・音色をREVEAL時に表示する

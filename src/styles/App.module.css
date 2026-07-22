@@ -1,6 +1,6 @@
 .app {
   width: 100%;
-  max-width: 640px;
+  max-width: 760px;
   padding: 24px 16px 48px;
   display: flex;
   flex-direction: column;
@@ -9,16 +9,22 @@
 }
 
 .title {
-  font-size: 32px;
-  font-weight: 600;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
   margin: 16px 0 24px;
+  background: linear-gradient(135deg, var(--color-question), var(--color-question-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .stage {
   width: 100%;
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
   padding: 32px 20px;
   display: flex;
   flex-direction: column;

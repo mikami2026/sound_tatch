@@ -5,7 +5,7 @@ import { NextButton } from './components/NextButton';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useGameSequence, type GameSettings, type Phase } from './hooks/useGameSequence';
 import { preloadAllSamples } from './audio/soundEngine';
-import type { NoteName } from './audio/notes';
+import { baseDegreeLabel, type NoteName } from './audio/notes';
 import styles from './styles/App.module.css';
 
 const INITIAL_SETTINGS: GameSettings = {
@@ -27,7 +27,7 @@ function buildActiveKeys(phase: Phase, questionNotes: NoteName[]): ActiveKey[] {
       return questionNotes.map((note) => ({
         note,
         color: 'green',
-        label: note === 'ド2' ? 'ド' : note,
+        label: baseDegreeLabel(note),
       }));
     default:
       return [];

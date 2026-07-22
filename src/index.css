@@ -1,17 +1,22 @@
 :root {
   --bg: #f4f5f9;
+  --bg-accent: #eef0fb;
   --text: #1f2233;
+  --text-muted: #6b7280;
   --card-bg: #ffffff;
   --border: #dcdfe6;
+  --card-shadow: 0 12px 32px rgba(31, 34, 51, 0.08);
 
   --color-reference: #f5c518;
   --color-question: #3b82f6;
+  --color-question-2: #6366f1;
   --color-reveal: #22c55e;
 
-  font: 18px/145% system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Zen Maru Gothic', system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-size: 18px;
+  line-height: 145%;
   color-scheme: light dark;
   color: var(--text);
-  background: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -19,9 +24,12 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #14151c;
+    --bg-accent: #1b1c2a;
     --text: #e5e7eb;
+    --text-muted: #9ca3af;
     --card-bg: #1f2028;
     --border: #2e303a;
+    --card-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   }
 }
 
@@ -31,6 +39,8 @@
 
 body {
   margin: 0;
+  min-height: 100svh;
+  background: linear-gradient(160deg, var(--bg-accent), var(--bg) 55%);
 }
 
 #root {

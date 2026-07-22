@@ -1,12 +1,33 @@
+.keyboardScroll {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.keyboardScroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.keyboardScroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+.keyboardScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .keyboard {
   position: relative;
-  width: 504px;
-  max-width: 100%;
+  width: fit-content;
+  margin: 0 auto;
 }
 
 .whiteRow {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .blackRow {

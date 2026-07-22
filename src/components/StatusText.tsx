@@ -1,27 +1,11 @@
 import type { Phase } from '../hooks/useGameSequence';
-import type { NoteName } from '../audio/notes';
+import { displayLabel, type NoteName } from '../audio/notes';
 import styles from '../styles/StatusText.module.css';
 
 interface StatusTextProps {
   phase: Phase;
   questionNotes: NoteName[];
 }
-
-const DISPLAY_LABEL: Record<NoteName, string> = {
-  ド: 'ド',
-  'ド♯': 'ド♯',
-  レ: 'レ',
-  'レ♯': 'レ♯',
-  ミ: 'ミ',
-  ファ: 'ファ',
-  'ファ♯': 'ファ♯',
-  ソ: 'ソ',
-  'ソ♯': 'ソ♯',
-  ラ: 'ラ',
-  'ラ♯': 'ラ♯',
-  シ: 'シ',
-  ド2: 'ド（高）',
-};
 
 function messageFor(phase: Phase, questionNotes: NoteName[]): string {
   switch (phase) {
@@ -36,7 +20,7 @@ function messageFor(phase: Phase, questionNotes: NoteName[]): string {
     case 'countdown':
       return '考えてください…';
     case 'reveal':
-      return `正解：${questionNotes.map((n) => DISPLAY_LABEL[n]).join('・')}`;
+      return `正解：${questionNotes.map(displayLabel).join('・')}`;
     default:
       return '';
   }
