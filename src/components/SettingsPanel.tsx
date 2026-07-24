@@ -6,6 +6,7 @@ interface SettingsPanelProps {
   settings: GameSettings;
   onChange: (next: GameSettings) => void;
   disabled: boolean;
+  fiveNoteUnlocked: boolean;
 }
 
 const NOTE_COUNT_OPTIONS = [1, 2, 3, 'random'] as const;
@@ -15,7 +16,12 @@ const MODE_OPTIONS: { id: GameSettings['mode']; label: string }[] = [
   { id: 'challenge', label: '挑戦者' },
 ];
 
-export function SettingsPanel({ settings, onChange, disabled }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onChange, disabled, fiveNoteUnlocked }: SettingsPanelProps) {
+  // 「5音」は隠し要素。解放済みのときだけ 3音 とランダムの間に差し込む。
+  const noteCountOptions = fiveNoteUnlocked
+    ? ([1, 2, 3, 5, 'random'] as const)
+    : NOTE_COUNT_OPTIONS;
+
   return (
     <div className={styles.panel}>
       <div className={styles.noteCountRow}>
@@ -58,7 +64,7 @@ export function SettingsPanel({ settings, onChange, disabled }: SettingsPanelPro
       <div className={styles.noteCountRow}>
         <span className={styles.noteCountLabel}>同時に鳴らす音の数</span>
         <div className={styles.segmented}>
-          {NOTE_COUNT_OPTIONS.map((count) => (
+          {noteCountOptions.map((count) => (
             <button
               key={count}
               type="button"

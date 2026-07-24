@@ -19,10 +19,32 @@ export type GameMode = 'listen' | 'challenge';
 const NOTE_COUNT_CHOICES = [1, 2, 3] as const;
 const INSTRUMENT_CHOICES = Object.keys(INSTRUMENTS) as InstrumentId[];
 
+// 隠し要素: 挑戦者モードで「3音」を連続10回正解すると「5音」が解放される。
+// 解放状態はlocalStorageに保存し、一度解放したら以降ずっと選べるようにする。
+const FIVE_NOTE_UNLOCK_KEY = 'sound-tatch:fiveNoteUnlocked';
+export const FIVE_NOTE_UNLOCK_STREAK = 10;
+export const FIVE_NOTE_UNLOCK_COUNT = 3;
+
+function readFiveNoteUnlocked(): boolean {
+  try {
+    return localStorage.getItem(FIVE_NOTE_UNLOCK_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function persistFiveNoteUnlocked(): void {
+  try {
+    localStorage.setItem(FIVE_NOTE_UNLOCK_KEY, '1');
+  } catch {
+    // localStorageが使えない環境でも解放演出だけは機能させる（永続化は諦める）
+  }
+}
+
 export interface GameSettings {
   referenceEnabled: boolean;
   includeBlackKeys: boolean;
-  noteCount: 1 | 2 | 3 | 'random';
+  noteCount: 1 | 2 | 3 | 5 | 'random';
   instrument: InstrumentId | 'random';
   mode: GameMode; // 'listen'=自動で答え合わせ、'challenge'=クリックで回答し間違えたら終了
 }
@@ -46,6 +68,9 @@ export function useGameSequence(settings: GameSettings) {
   const [wrongNote, setWrongNote] = useState<NoteName | null>(null);
   const [streak, setStreak] = useState(0);
   const [replayAvailable, setReplayAvailable] = useState(false);
+  const [fiveNoteUnlocked, setFiveNoteUnlocked] = useState(readFiveNoteUnlocked);
+  // 解放した瞬間だけtrueにするお祝い演出用フラグ（ユーザーが閉じるまで表示）。
+  const [justUnlocked, setJustUnlocked] = useState(false);
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const settingsRef = useRef(settings);
@@ -63,6 +88,10 @@ export function useGameSequence(settings: GameSettings) {
   selectedNotesRef.current = selectedNotes;
   const replayAvailableRef = useRef(false);
   replayAvailableRef.current = replayAvailable;
+  const streakRef = useRef(0);
+  streakRef.current = streak;
+  const fiveNoteUnlockedRef = useRef(fiveNoteUnlocked);
+  fiveNoteUnlockedRef.current = fiveNoteUnlocked;
 
   // そのラウンドの問題再生に使った音色（'random'解決後の実際の値）を覚えておき、
   // 「もう一度聞く」でも同じ音色で再生できるようにする。
@@ -170,7 +199,25 @@ export function useGameSequence(settings: GameSettings) {
 
       if (next.length === notes.length) {
         // 全音正解: 少し表示してから自動で次のラウンドへ
-        setStreak((s) => s + 1);
+        const nextStreak = streakRef.current + 1;
+        setStreak(nextStreak);
+
+        // 隠し要素の解放判定: 「3音」設定で連続10回正解に到達したら「5音」を解放。
+        // noteCountは実行中ロックされるため、このラウンド＝3音固定と判断できる。
+        if (
+          !fiveNoteUnlockedRef.current &&
+          settingsRef.current.noteCount === FIVE_NOTE_UNLOCK_COUNT &&
+          nextStreak >= FIVE_NOTE_UNLOCK_STREAK
+        ) {
+          persistFiveNoteUnlocked();
+          setFiveNoteUnlocked(true);
+          setJustUnlocked(true);
+          // お祝い表示中はゲームを一時停止。次のラウンドはユーザーが
+          // オーバーレイを閉じた（dismissUnlock）ときに開始する。
+          setPhase('correct');
+          return;
+        }
+
         setPhase('correct');
         schedule(() => startRoundRef.current(), CORRECT_DISPLAY_MS);
       }
@@ -185,6 +232,12 @@ export function useGameSequence(settings: GameSettings) {
     playNotes(questionNotesRef.current, roundInstrumentRef.current, QUESTION_DURATION_MS);
   }, []);
 
+  const dismissUnlock = useCallback(() => {
+    setJustUnlocked(false);
+    // 一時停止していたゲームを再開し、次のラウンドへ進む。
+    startRoundRef.current();
+  }, []);
+
   return {
     phase,
     questionNotes,
@@ -192,9 +245,12 @@ export function useGameSequence(settings: GameSettings) {
     wrongNote,
     streak,
     replayAvailable,
+    fiveNoteUnlocked,
+    justUnlocked,
     start,
     stop,
     answerNote,
     replay,
+    dismissUnlock,
   };
 }

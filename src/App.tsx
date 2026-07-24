@@ -70,10 +70,13 @@ function App() {
     wrongNote,
     streak,
     replayAvailable,
+    fiveNoteUnlocked,
+    justUnlocked,
     start,
     stop,
     answerNote,
     replay,
+    dismissUnlock,
   } = useGameSequence(settings);
 
   const activeKeys = useMemo(
@@ -97,7 +100,12 @@ function App() {
       <h1 className={styles.title}>音あてゲーム</h1>
 
       <div className={styles.stage}>
-        <SettingsPanel settings={settings} onChange={setSettings} disabled={isRunning} />
+        <SettingsPanel
+          settings={settings}
+          onChange={setSettings}
+          disabled={isRunning}
+          fiveNoteUnlocked={fiveNoteUnlocked}
+        />
 
         <StatusText
           phase={phase}
@@ -132,6 +140,22 @@ function App() {
       </div>
 
       <Footer />
+
+      {justUnlocked && (
+        <div className={styles.unlockOverlay} role="dialog" aria-modal="true">
+          <div className={styles.unlockCard}>
+            <p className={styles.unlockEmoji}>🎉</p>
+            <p className={styles.unlockTitle}>5音モード解放！</p>
+            <p className={styles.unlockDesc}>
+              3音・連続10回クリア達成！<br />
+              「同時に鳴らす音の数」に <strong>5音</strong> が追加されました。
+            </p>
+            <button type="button" className={styles.unlockButton} onClick={dismissUnlock}>
+              やった！
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
