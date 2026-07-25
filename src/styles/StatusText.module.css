@@ -6,9 +6,54 @@
 }
 
 .streak {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
   font-size: 14px;
   font-weight: 700;
   color: var(--text-muted);
+}
+
+.rank {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--text-strong, #6b4bb4);
+  font-size: 13px;
+}
+
+.best {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.newBest {
+  color: #e8590c;
+  font-weight: 800;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.record {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.difficulty {
+  color: var(--text-strong, #6b4bb4);
+  font-weight: 700;
 }
 
 .status {

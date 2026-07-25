@@ -72,6 +72,12 @@ function App() {
     replayAvailable,
     fiveNoteUnlocked,
     justUnlocked,
+    bestStreak,
+    totalCorrect,
+    totalGames,
+    difficultyLabel,
+    beatBest,
+    gameoverMessage,
     start,
     stop,
     answerNote,
@@ -113,6 +119,12 @@ function App() {
           selectedNotes={selectedNotes}
           mode={settings.mode}
           streak={streak}
+          bestStreak={bestStreak}
+          totalCorrect={totalCorrect}
+          totalGames={totalGames}
+          difficultyLabel={difficultyLabel}
+          beatBest={beatBest}
+          gameoverMessage={gameoverMessage}
         />
 
         <Keyboard
