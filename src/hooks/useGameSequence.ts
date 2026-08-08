@@ -28,7 +28,9 @@ export type Phase =
   | 'correct'
   | 'gameover';
 
-export type GameMode = 'listen' | 'challenge';
+// 'listen'=自動で答え合わせ、'challenge'=クリックで回答、
+// 'practice'=出題なしで自由に鍵盤を鳴らす練習（進行はusePracticeKeyboardが持つ）
+export type GameMode = 'listen' | 'challenge' | 'practice';
 
 const NOTE_COUNT_CHOICES = [1, 2, 3] as const;
 const INSTRUMENT_CHOICES = Object.keys(INSTRUMENTS) as InstrumentId[];
@@ -60,7 +62,7 @@ export interface GameSettings {
   includeBlackKeys: boolean;
   noteCount: 1 | 2 | 3 | 5 | 'random';
   instrument: InstrumentId | 'random';
-  mode: GameMode; // 'listen'=自動で答え合わせ、'challenge'=クリックで回答し間違えたら終了
+  mode: GameMode;
 }
 
 const REFERENCE_NOTE: NoteName = 'ド';

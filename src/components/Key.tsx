@@ -1,6 +1,7 @@
 import styles from '../styles/Key.module.css';
 
-export type KeyColor = 'none' | 'yellow' | 'green' | 'red';
+// 'blue' は練習モードで自分が押した鍵盤の点灯用（出題・正誤の色と混同させない）
+export type KeyColor = 'none' | 'yellow' | 'green' | 'red' | 'blue';
 export type KeyVariant = 'white' | 'black';
 
 interface KeyProps {

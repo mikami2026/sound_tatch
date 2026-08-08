@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackgroundNotes } from './components/BackgroundNotes';
 import { Footer } from './components/Footer';
 import { Keyboard, type ActiveKey } from './components/Keyboard';
@@ -6,6 +6,7 @@ import { StatusText } from './components/StatusText';
 import { NextButton } from './components/NextButton';
 import { SettingsPanel } from './components/SettingsPanel';
 import { useGameSequence, type GameSettings, type Phase } from './hooks/useGameSequence';
+import { usePracticeKeyboard } from './hooks/usePracticeKeyboard';
 import { preloadAllSamples } from './audio/soundEngine';
 import { baseDegreeLabel, type NoteName } from './audio/notes';
 import styles from './styles/App.module.css';
@@ -85,14 +86,43 @@ function App() {
     dismissUnlock,
   } = useGameSequence(settings);
 
-  const activeKeys = useMemo(
+  const {
+    litNotes,
+    lastNote: practiceNote,
+    playNote: playPracticeNote,
+    reset: resetPractice,
+  } = usePracticeKeyboard(settings);
+
+  const isPractice = settings.mode === 'practice';
+
+  const gameActiveKeys = useMemo(
     () => buildActiveKeys(phase, questionNotes, selectedNotes, wrongNote),
     [phase, questionNotes, selectedNotes, wrongNote],
   );
 
+  // 練習モードでは「自分が押した鍵盤」を青く光らせる（出題の緑/黄と区別する）。
+  const practiceActiveKeys = useMemo<ActiveKey[]>(
+    () => litNotes.map((note) => ({ note, color: 'blue', label: baseDegreeLabel(note) })),
+    [litNotes],
+  );
+
+  const activeKeys = isPractice ? practiceActiveKeys : gameActiveKeys;
+
   const isIdle = phase === 'idle';
   const isGameOver = phase === 'gameover';
-  const isRunning = !isIdle && !isGameOver;
+  const isRunning = !isPractice && !isIdle && !isGameOver;
+
+  // モードを切り替えるときは、前のモードの残り状態（gameover表示・光ったままの鍵盤）を消す。
+  const handleSettingsChange = useCallback(
+    (next: GameSettings) => {
+      if (next.mode !== settings.mode) {
+        stop();
+        resetPractice();
+      }
+      setSettings(next);
+    },
+    [settings.mode, stop, resetPractice],
+  );
 
   useEffect(() => {
     // ピアノ音源（サンプル音声）はネットワーク読み込みが必要なため、
@@ -108,7 +138,7 @@ function App() {
       <div className={styles.stage}>
         <SettingsPanel
           settings={settings}
-          onChange={setSettings}
+          onChange={handleSettingsChange}
           disabled={isRunning}
           fiveNoteUnlocked={fiveNoteUnlocked}
         />
@@ -125,12 +155,15 @@ function App() {
           difficultyLabel={difficultyLabel}
           beatBest={beatBest}
           gameoverMessage={gameoverMessage}
+          practiceNote={practiceNote}
         />
 
         <Keyboard
           activeKeys={activeKeys}
           includeBlackKeys={settings.includeBlackKeys}
-          onNoteClick={phase === 'answering' ? answerNote : undefined}
+          onNoteClick={
+            isPractice ? playPracticeNote : phase === 'answering' ? answerNote : undefined
+          }
         />
 
         {settings.mode === 'challenge' && !isIdle && (
@@ -144,11 +177,14 @@ function App() {
           </button>
         )}
 
-        <NextButton
-          label={isIdle ? 'スタート' : isGameOver ? 'もう一度' : 'とめる'}
-          disabled={false}
-          onClick={isIdle || isGameOver ? start : stop}
-        />
+        {/* 練習モードは開始・停止の概念がないため、スタートボタンは出さない */}
+        {!isPractice && (
+          <NextButton
+            label={isIdle ? 'スタート' : isGameOver ? 'もう一度' : 'とめる'}
+            disabled={false}
+            onClick={isIdle || isGameOver ? start : stop}
+          />
+        )}
       </div>
 
       <Footer />

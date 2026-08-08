@@ -14,6 +14,7 @@ interface StatusTextProps {
   difficultyLabel: string;
   beatBest: boolean;
   gameoverMessage: string;
+  practiceNote: NoteName | null;
 }
 
 // 連続正解数に応じた称号。3連続からだんだん上のランクになる。
@@ -75,7 +76,20 @@ export function StatusText({
   difficultyLabel,
   beatBest,
   gameoverMessage,
+  practiceNote,
 }: StatusTextProps) {
+  // 練習モードは出題・成績が存在しないので、専用の案内と「いま鳴らした音」だけを出す。
+  if (mode === 'practice') {
+    return (
+      <div className={styles.wrapper}>
+        <p className={styles.record}>鍵盤をクリックすると、その音が鳴ります</p>
+        <p className={styles.status}>
+          {practiceNote ? `♪ ${displayLabel(practiceNote)}` : '好きな音を押してみましょう'}
+        </p>
+      </div>
+    );
+  }
+
   const isChallenge = mode === 'challenge';
   const rank = rankLabel(streak);
   // ゲーム進行中（idle以外）はその挑戦の連続正解と自己ベストを、

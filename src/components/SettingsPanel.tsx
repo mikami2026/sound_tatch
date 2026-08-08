@@ -14,6 +14,7 @@ const INSTRUMENT_OPTIONS = [...Object.values(INSTRUMENTS), { id: 'random' as con
 const MODE_OPTIONS: { id: GameSettings['mode']; label: string }[] = [
   { id: 'listen', label: 'きく（自動）' },
   { id: 'challenge', label: '挑戦者' },
+  { id: 'practice', label: '練習' },
 ];
 
 export function SettingsPanel({ settings, onChange, disabled, fiveNoteUnlocked }: SettingsPanelProps) {
@@ -21,6 +22,9 @@ export function SettingsPanel({ settings, onChange, disabled, fiveNoteUnlocked }
   const noteCountOptions = fiveNoteUnlocked
     ? ([1, 2, 3, 5, 'random'] as const)
     : NOTE_COUNT_OPTIONS;
+
+  // 練習モードは出題しないので、出題に関する設定（基準音・同時に鳴らす音の数）は隠す。
+  const isPractice = settings.mode === 'practice';
 
   return (
     <div className={styles.panel}>
@@ -41,15 +45,17 @@ export function SettingsPanel({ settings, onChange, disabled, fiveNoteUnlocked }
         </div>
       </div>
 
-      <label className={styles.toggleRow}>
-        <input
-          type="checkbox"
-          checked={settings.referenceEnabled}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...settings, referenceEnabled: e.target.checked })}
-        />
-        基準音（ド）を鳴らす
-      </label>
+      {!isPractice && (
+        <label className={styles.toggleRow}>
+          <input
+            type="checkbox"
+            checked={settings.referenceEnabled}
+            disabled={disabled}
+            onChange={(e) => onChange({ ...settings, referenceEnabled: e.target.checked })}
+          />
+          基準音（ド）を鳴らす
+        </label>
+      )}
 
       <label className={styles.toggleRow}>
         <input
@@ -58,25 +64,27 @@ export function SettingsPanel({ settings, onChange, disabled, fiveNoteUnlocked }
           disabled={disabled}
           onChange={(e) => onChange({ ...settings, includeBlackKeys: e.target.checked })}
         />
-        黒鍵（半音）も出題する
+        {isPractice ? '黒鍵（半音）も表示する' : '黒鍵（半音）も出題する'}
       </label>
 
-      <div className={styles.noteCountRow}>
-        <span className={styles.noteCountLabel}>同時に鳴らす音の数</span>
-        <div className={styles.segmented}>
-          {noteCountOptions.map((count) => (
-            <button
-              key={count}
-              type="button"
-              className={count === settings.noteCount ? styles.segmentActive : styles.segment}
-              disabled={disabled}
-              onClick={() => onChange({ ...settings, noteCount: count })}
-            >
-              {count === 'random' ? 'ランダム' : `${count}音`}
-            </button>
-          ))}
+      {!isPractice && (
+        <div className={styles.noteCountRow}>
+          <span className={styles.noteCountLabel}>同時に鳴らす音の数</span>
+          <div className={styles.segmented}>
+            {noteCountOptions.map((count) => (
+              <button
+                key={count}
+                type="button"
+                className={count === settings.noteCount ? styles.segmentActive : styles.segment}
+                disabled={disabled}
+                onClick={() => onChange({ ...settings, noteCount: count })}
+              >
+                {count === 'random' ? 'ランダム' : `${count}音`}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className={styles.noteCountRow}>
         <span className={styles.noteCountLabel}>音色</span>

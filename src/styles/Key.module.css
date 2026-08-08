@@ -68,6 +68,15 @@
   box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.25);
 }
 
+/* 練習モードで自分が押した鍵盤。押した瞬間だけふわっと光らせる
+   （yellowのような無限アニメーションにすると連打時にちらつくため1回きり）。 */
+.blue {
+  background: linear-gradient(135deg, var(--color-question), var(--color-question-2));
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
+  animation: keyPress 0.18s ease;
+}
+
 .red {
   background: var(--color-wrong);
   color: #fff;
@@ -81,6 +90,16 @@
   }
   to {
     transform: scale(1.06);
+  }
+}
+
+@keyframes keyPress {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08);
   }
 }
 
