@@ -42,6 +42,14 @@ export interface SampledInstrumentDef extends InstrumentBase {
   samples: SampleDef[];
   attackMs: number;
   releaseMs: number;
+  // 音源ファイルごとの録音レベルの差を吸収する正規化係数（省略時は1＝補正なし）。
+  // soundEngineが渡すpeakGainは「その音に割り当てた振幅の上限」を意味するが、
+  // 録音サンプルは正規化されていないため、そのまま掛けると
+  // 「実際の振幅 = peakGain × 録音のピーク」となり音源ごとに音量がばらつく。
+  // 1 ÷ その音源セットの最大ピーク値 を掛けてピークを1.0に揃えることで、
+  // 合成音（オシレーターは振幅±1）やほかのサンプル楽器と同じ音量感になる。
+  // ※最大ピークで割るので、正規化しても振幅がpeakGainを超える＝音割れすることはない。
+  gain?: number;
 }
 
 export type InstrumentDef = SynthInstrumentDef | SampledInstrumentDef;
@@ -74,6 +82,9 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     ],
     attackMs: 5,
     releaseMs: 300,
+    // Salamander音源は正規化されておらず、実測ピークが0.10〜0.24しかない
+    // （中間ベロシティの録音そのままのため）。最大値0.24に合わせて約4倍に持ち上げる。
+    gain: 4.1,
   },
   organ: {
     id: 'organ',
@@ -106,6 +117,8 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     ],
     attackMs: 15,
     releaseMs: 200,
+    // VSCO2の音源は -3dBFS（ピーク約0.71）で正規化されているので、その分だけ戻す。
+    gain: 1.4,
   },
   flute: {
     id: 'flute',
@@ -124,6 +137,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     ],
     attackMs: 15,
     releaseMs: 200,
+    gain: 1.4, // violinと同じくVSCO2の正規化分（ピーク約0.71）を戻す
   },
   trumpet: {
     id: 'trumpet',
@@ -144,5 +158,6 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentDef> = {
     ],
     attackMs: 10,
     releaseMs: 150,
+    gain: 1.4, // violinと同じくVSCO2の正規化分（ピーク約0.71）を戻す
   },
 };

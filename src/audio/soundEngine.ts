@@ -1,6 +1,7 @@
 import { NOTE_FREQUENCIES, type NoteName } from './notes';
 import { INSTRUMENTS, type InstrumentId, type EnvelopeDef } from './instruments';
 import { playSampledNote, preloadSamples } from './sampleEngine';
+import { masterOutput } from './masterOutput';
 
 let audioContext: AudioContext | null = null;
 
@@ -54,7 +55,7 @@ function scheduleTone(
   gainNode.gain.linearRampToValueAtTime(0, stopTime + releaseSec);
 
   oscillator.connect(gainNode);
-  gainNode.connect(ctx.destination);
+  gainNode.connect(masterOutput(ctx));
 
   oscillator.start(startTime);
   oscillator.stop(stopTime + releaseSec + 0.02);

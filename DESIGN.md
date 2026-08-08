@@ -35,14 +35,15 @@
 
 ```ts
 type InstrumentId = 'triangle' | 'piano' | 'organ' | 'violin' | 'flute' | 'trumpet'; // 音色（拡張可能なレジストリ）
-type GameMode = 'listen' | 'challenge'; // 'listen'=自動で答え合わせ、'challenge'=クリックで回答
+// 'listen'=自動で答え合わせ、'challenge'=クリックで回答、'practice'=出題なしの自由演奏
+type GameMode = 'listen' | 'challenge' | 'practice';
 
 interface GameSettings {
   referenceEnabled: boolean;            // 基準音「ド」を鳴らすか（false＝絶対音感モード）
   includeBlackKeys: boolean;            // 黒鍵（半音）も出題範囲に含めるか
   noteCount: 1 | 2 | 3 | 'random';      // 同時に鳴らす問題音の数（'random'は毎ラウンド抽選）
   instrument: InstrumentId | 'random';  // 音色プリセット（'random'は毎ラウンド抽選）
-  mode: GameMode;                       // きく（自動）／挑戦者
+  mode: GameMode;                       // きく（自動）／挑戦者／練習
 }
 ```
 
@@ -192,10 +193,33 @@ interface SampledInstrumentDef {
   samples: SampleDef[];
   attackMs: number;
   releaseMs: number;
+  gain?: number; // 録音レベルの正規化係数（下記「音源ごとの音量差の正規化」参照）
 }
 
 type InstrumentDef = SynthInstrumentDef | SampledInstrumentDef;
 ```
+
+#### 音源ごとの音量差の正規化（`gain`）
+
+`soundEngine`が各音に渡す`peakGain`は「その音に割り当てた振幅の上限」を意味する。
+オシレーターの出力振幅は±1なので合成音ではそのまま成立するが、**録音サンプルは
+音源セットごとに録音レベルが違う**ため、そのまま掛けると
+「実際の振幅 = peakGain × 録音のピーク値」となり音量がばらつく。実測値は以下の通り:
+
+| 音源 | ファイルのピーク | 備考 |
+| --- | --- | --- |
+| piano（Salamander） | 0.10〜0.24 | 正規化されていない中間ベロシティの録音そのまま |
+| violin / flute / trumpet（VSCO2） | 約0.71 | -3dBFSで正規化済み |
+
+このためピアノだけ他の音色の1/3〜1/7の音量で鳴っていた（全モード共通の問題）。
+`SampledInstrumentDef.gain`に **1 ÷ その音源セットの最大ピーク値** を持たせ、
+`sampleEngine`が`peakGain × gain`を実際のゲインとして使うことでピークを揃える
+（piano: 4.1、VSCO2勢: 1.4）。最大ピークで割るため、正規化しても振幅が`peakGain`を
+超えることはない＝音割れの原因にはならない。
+
+なお、ピアノは音源セット内でもファイルごとのピークに2倍程度のばらつきがある
+（最小0.103／最大0.24）ため、音によって多少の音量差が残る。完全に揃えるには
+`SampleDef`ごとの`gain`が必要（今後の拡張案）。
 
 **synth楽器**（`triangle`＝基本、`organ`＝オルガン風）はこれまで通りオシレーター加算合成。
 
@@ -285,6 +309,29 @@ type InstrumentDef = SynthInstrumentDef | SampledInstrumentDef;
   `setState(prev => ...)`形式の更新関数を開発時に二重実行する挙動があるため、
   更新関数の中でさらに`setPhase`等の副作用を呼ばない設計にしている
   （`phaseRef`/`questionNotesRef`/`selectedNotesRef`で最新値を読み、判定はrefベースで行う）。
+
+### 3.7 練習モード（`mode: 'practice'`）
+
+出題・採点をいっさい行わず、**自分で鍵盤を押して音を確かめる**ためのモード。
+「この音はどんな高さだったか」を確認したり、出題前に音階を体に入れたりする用途を想定している。
+
+- 進行（フェーズ）を持たないため、`useGameSequence`ではなく独立した
+  `usePracticeKeyboard`フックが担当する。`useGameSequence`は`idle`のまま何もしない。
+- 鍵盤は常にクリック可能で、押した音を`playNotes([note], instrument, 900ms)`で1音鳴らす
+  （長さは問題音`QUESTION_DURATION_MS`と同じにして、ゲーム中と同じ聞こえ方にする）。
+- 押した鍵盤は青（`--color-question`系グラデーション、`KeyColor: 'blue'`）で点灯し、
+  鳴り終わり（900ms）と同時に消灯する。出題の黄（基準音）・緑（正解）・赤（誤答）とは
+  別の色にして、ゲーム中の意味と混同しないようにしている。
+  点灯タイマーは**押した音ごとに個別に持つ**ため、続けて押せば複数の鍵盤が同時に光り、
+  和音のように鳴らせる（同じ鍵盤の連打では前のタイマーを捨てて点灯を延長する）。
+- ステータステキストには案内文と「いま鳴らした音」（`displayLabel`＝オクターブ注記つき）を表示。
+- UIの出し引き:
+  - `SettingsPanel`は「基準音（ド）を鳴らす」「同時に鳴らす音の数」を隠す（出題しないため）。
+    黒鍵チェックボックスは残し、ラベルだけ「黒鍵（半音）も**表示**する」に変える。
+    音色はそのまま使える（`'random'`は**押すたび**に抽選され、毎回ちがう楽器で同じ音を聞ける）。
+  - 開始・停止の概念がないため`NextButton`（スタート／とめる）は表示しない。
+- モードを切り替えたときは`App`側で`stop()`＋練習状態の`reset()`を行い、
+  前のモードの残り（`gameover`表示や点灯したままの鍵盤）を持ち越さないようにする。
 
 ## 4. 状態遷移設計
 
@@ -417,13 +464,16 @@ src/
  │   ├─ notes.ts             … 音名⇔周波数の対応表（白鍵/黒鍵の並びも含む）
  │   ├─ instruments.ts       … 音色プリセットのレジストリ（synth/sample双方のInstrumentDef）
  │   ├─ sampleEngine.ts      … サンプル音源の読み込み・キャッシュ・ピッチシフト再生
+ │   ├─ masterOutput.ts      … 出力最終段のリミッター（重ねて鳴らしたときの音割れ防止）
  │   └─ soundEngine.ts       … Web Audio APIラッパー（playNotes関数。synth/sample振り分け）
  ├─ hooks/
- │   └─ useGameSequence.ts   … フェーズ遷移＆タイマー・挑戦者モードの回答判定を管理するカスタムフック
+ │   ├─ useGameSequence.ts   … フェーズ遷移＆タイマー・挑戦者モードの回答判定を管理するカスタムフック
+ │   └─ usePracticeKeyboard.ts … 練習モード（出題なしの自由演奏）の発音・点灯を管理するフック
  ├─ components/
  │   ├─ SettingsPanel.tsx    … モード・基準音オン/オフ・黒鍵オン/オフ・音数・音色の設定UI
- │   │                          （音数/音色は「ランダム」選択も可能）
+ │   │                          （音数/音色は「ランダム」選択も可能。練習モードでは出題系設定を隠す）
  │   ├─ StatusText.tsx       … フェーズごとの案内テキスト・連続正解数（挑戦者モード）
+ │   │                          ・いま鳴らした音（練習モード）
  │   ├─ Keyboard.tsx         … 白鍵15＋黒鍵10の鍵盤表示（発光状態・クリックをpropsで受け取る）
  │   ├─ Key.tsx              … 鍵盤1つ分（白鍵/黒鍵のvariant・色・ラベル・アニメーション・クリック）
  │   ├─ NextButton.tsx       … スタート/とめる/もう一度ボタン（常時活性、ラベルはphaseで切替）
@@ -471,7 +521,15 @@ interface GameState {
     プリセットのみだが、将来別のsynth楽器を追加する際に基音より速く/遅く減衰する
     倍音を作れるよう型として残してある）を反映したエンベロープを個別に組み立てる。
   - `kind === 'sample'`: `sampleEngine.playSampledNote`に委譲し、`AudioBufferSourceNode`
-    で録音済みサンプルを再生する（詳細は3.5節）。
+    で録音済みサンプルを再生する（詳細は3.5節）。音源ごとの録音レベル差は
+    `instrument.gain`で正規化してから振幅予算を適用する。
+- 出力の最終段には`masterOutput.ts`のリミッター（`DynamicsCompressorNode`）を1つ置き、
+  すべての音は`destination`ではなくこのノードに接続する。振幅予算（合計0.8）は
+  **1回の`playNotes`の中**でしか配分できず、独立した再生が時間的に重なるケース
+  （練習モードで複数の鍵盤を続けて押す、前の音の余韻中に「もう一度聞く」を押す）では
+  合計が1.0を超えて音割れしていた（実測: 練習モードで3鍵同時に押すとピーク1.84）。
+  閾値は-1dB（≒0.89）で単音の通常ピーク（約0.85）より上に置いてあるため、
+  単音は素通りし、重なったときだけ押さえ込まれる。
 - `noteNames`の要素数（`noteCount`）が1でも3でも呼び出し側は同じシグネチャで済み、
   `soundEngine`側の変更は不要。
 - ゲイン計算: 1音あたりの振幅予算`noteBudget = 0.8/noteCount`に対し、synth楽器は
@@ -503,11 +561,11 @@ interface GameState {
 - 鍵盤全体の幅（15鍵分）は画面幅を超えることがあるため、`.keyboardScroll`
   （`overflow-x: auto`）でラップし、狭い画面では横スクロールできるようにしている。
 - `Key`は`variant: 'white' | 'black'`を受け取り、既定の見た目（白鍵は明るい枠、
-  黒鍵は暗色＋影）を切り替える。`color`（'none'/'yellow'/'green'/'red'）は`variant`に関わらず
-  共通のハイライト色として上書き適用される。
+  黒鍵は暗色＋影）を切り替える。`color`（'none'/'yellow'/'green'/'red'/'blue'）は`variant`に
+  関わらず共通のハイライト色として上書き適用される（'blue'は練習モードで自分が押した鍵盤）。
 - `Key`は実体としては`<button>`（`onClick`が渡されないときは`disabled`）。挑戦者モードの
-  `answering`フェーズでのみ`Keyboard`から実際のクリックハンドラが渡され、それ以外の
-  フェーズでは非活性ボタンとしてレンダリングされる（クリックしても何も起きない）。
+  `answering`フェーズと練習モード（常時）でのみ`Keyboard`から実際のクリックハンドラが渡され、
+  それ以外のフェーズでは非活性ボタンとしてレンダリングされる（クリックしても何も起きない）。
 
 ## 7. 非機能・注意点
 
@@ -531,6 +589,8 @@ interface GameState {
   discriminated unionのため、`kind:'sample'`のプリセットを追加するだけで対応可能）。
 - ピアノのベロシティ（強弱）レイヤーへの対応（現在のSalamanderサンプルはmf相当の
   単一強弱のみ使用。fp/ffレイヤーも配布されているため、将来的な拡張余地あり）。
+- `SampleDef`単位の`gain`（現在の正規化は音源セット単位。ピアノはセット内でも
+  ファイルのピークが0.103〜0.24とばらつくため、音によって多少の音量差が残る）。
 - 打楽器（マリンバ・木琴等の音程が明確なもの）の追加は今回見送った。
   必要になれば`violin`等と同じ`kind:'sample'`パターンで追加できる。
 - 挑戦者モードの連続正解数（`streak`）は現在ページ内のstateのみで、リロードすると消える。

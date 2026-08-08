@@ -1,5 +1,6 @@
 import { NOTE_ORDER, type NoteName } from './notes';
 import type { SampledInstrumentDef } from './instruments';
+import { masterOutput } from './masterOutput';
 
 const bufferCache = new Map<string, Promise<Map<NoteName, AudioBuffer>>>();
 
@@ -67,14 +68,18 @@ export function playSampledNote(
     const attackSec = instrument.attackMs / 1000;
     const releaseSec = instrument.releaseMs / 1000;
     const stopTime = startTime + durationSec;
+    // 録音レベルの差を吸収してから振幅予算（peakGain）を適用する。
+    // instrument.gainは「1 ÷ その音源セットの最大ピーク」なので、
+    // 掛けたあとの実際の振幅はpeakGainを超えない（詳細はinstruments.tsのコメント）。
+    const normalizedGain = peakGain * (instrument.gain ?? 1);
 
     gainNode.gain.setValueAtTime(0, startTime);
-    gainNode.gain.linearRampToValueAtTime(peakGain, startTime + attackSec);
-    gainNode.gain.setValueAtTime(peakGain, stopTime);
+    gainNode.gain.linearRampToValueAtTime(normalizedGain, startTime + attackSec);
+    gainNode.gain.setValueAtTime(normalizedGain, stopTime);
     gainNode.gain.linearRampToValueAtTime(0, stopTime + releaseSec);
 
     source.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    gainNode.connect(masterOutput(ctx));
 
     source.start(startTime);
     source.stop(stopTime + releaseSec + 0.02);
